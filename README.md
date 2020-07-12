@@ -600,8 +600,11 @@ plt.show()
 
 #### 卷积神经网络CNN文本分类
 
+[GitHub 代码库](https://github.com/NLPxiaoxu/Easy_TextCnn_Rnn)
+
 #### 循环神经网络RNN文本分类(LSTM长短记忆)
 
+[GitHub 代码库](https://github.com/NLPxiaoxu/Easy_TextCnn_Rnn)
 $$
 c_i = f_i \otimes c_{i-1} + i_i \otimes tanh(W_i x_i + U_i h_{i-1} +b_c)
 $$
@@ -610,11 +613,25 @@ $$
 
 #### 融合LSTM-CNN文本分类
 
-![5ae2ccd60001754204630501](C:\Users\LiuYangstatistic\Pictures\Saved Pictures\5ae2ccd60001754204630501.jpg)
-
 ​	RNN网络在文本分类中，作用是用来提取句子的关键语义信息，根据提取的语义对文本进行区分；CNN的作用是用来提取文本的特征，根据特征进行分类。LSTM+CNN的作用，就是两者的结合，首先抽取文本关键语义，然后对语义提取关键特征。
 
+##### 模型结构
+
+![5ae2ccd60001754204630501](C:\Users\LiuYangstatistic\Pictures\Saved Pictures\5ae2ccd60001754204630501.jpg)
+
+输入层
+
+LSTM层
+
+卷积层
+
+池化层
+
+输出层
+
 ##### 实现
+
+[GitHub 代码库](https://github.com/NLPxiaoxu/Easy_Lstm_Cnn)
 
 数据预处理
 
@@ -1008,6 +1025,8 @@ A(输入层: 文本中的单词和N-gram Feature的Embedding) -->B(隐藏层: �
 ​	第三，Fastext在进行训练时，提前计算出Character n-gram和Word n-gram，在训练时直接查询调取，也节省了时间复杂度。
 
 ##### 实现
+
+[GitHub 代码库](https://github.com/facebookresearch/fastText/tree/master/python)
 
 处理数据格式(对分词后保存的文件进行格式整理)
 
