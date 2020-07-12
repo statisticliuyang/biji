@@ -598,4 +598,167 @@ plt.show()
 
 ![res](D:\LiuYangStatistics\code\NLPTextClass\TextClassfer_classcal\res.png)
 
-#### CNN与G-CNN文本分类
+#### 卷积神经网络CNN文本分类
+
+#### 循环神经网络RNN文本分类(LSTM长短记忆)
+
+$$
+c_i = f_i \bigotimes c_{i-1} + i_i \bigotimes tanh(W_i x_i + U_i h_{i-1} +b_c)
+$$
+
+
+
+#### 融合LSTM-CNN文本分类
+
+![5ae2ccd60001754204630501](C:\Users\LiuYangstatistic\Pictures\Saved Pictures\5ae2ccd60001754204630501.jpg)
+
+​	RNN网络在文本分类中，作用是用来提取句子的关键语义信息，根据提取的语义对文本进行区分；CNN的作用是用来提取文本的特征，根据特征进行分类。LSTM+CNN的作用，就是两者的结合，首先抽取文本关键语义，然后对语义提取关键特征。
+
+|    模型   |    模型1   |    模型2   |    模型3   |    模型4   |
+| :---------: | :---------: | :---------: | :---------: | :---------: |
+|   **分词方法**   | *pkgseg* | *pkgseg* | *pkgseg* | *pkgseg* |
+|   **词频过滤**   | *删除低词频* | *删除低词频* | *保留高词频* | *保留高词频* |
+|   **词分布过滤**   | *删除小方差词* | *删除小方差词* | *否* | *否* |
+|   **字典词数**   | *849* | *849* | *9334* | *9334* |
+|   **迭代次数**   | *2* | *3* | *2* | *3* |
+|   **测试集准确率**   | *95.33%* | *95.53%* | *96.05%* | *96.96%* |
+|   **训练时间**   | - | - | *31m 28s* | - |
+|   **测试时间**   | *34.8s* | *35.4s%* | - | *40.0s* |
+
+
+#### Google AI 研究院FastText文本分类
+
+##### 相关文献
+
+*Bag of Tricks for Efficient Text Classification* (2016)
+
+ 	论文主要讲Text Classification，论文对CBOW模型做了一点改变，将模型的输出改为预测的Label而不是预测的单词，从而变成了一个分类模型。再输出层的优化方面，也跟CBOW的做法如出一辙，使用了多层Softmax(Hierarchical Softmax) 和负采样(Negative Sampling)的方法。
+
+*Enriching Word Vectors with Subword Information* (2016)
+
+​	论文主要讲Word Vector，提出了字符级别向量的概念(Character level features for NLP)，提出了类似 Word2Vec 中 Skip-gram 与 CBOW 的模型来训练字符向量。其中也是依靠条件概率公式表示预测词(Character)的出现概率，再通过最大似然估计将概率连乘转化为累加形式，最后使用SGD在最大化概率的同时，更新学习参数。
+
+##### FastText分类模型
+
+​	结构分为三层：
+
+```mermaid
+graph TD
+A(输入层: 文本中的单词和N-gram Feature的Embedding) -->B(隐藏层: 在这一层进行的操作只是将输出层输入的Embedding Vector进行求平均)	
+	B --> C(输出层: 输出文本的类别)
+```
+
+其中，输入层的输入为文本中的单词和N-gram Feature的Embedding，实际上是使用一个one-hot向量乘以Embedding存放矩阵得到每个词的Embedding的过程。
+
+​	隐藏层，Hidden Layer，在这一层进行的操作是将输出层输入的Embedding Vector进行求平均(Word2Vec的模型中也把这一层称之为投影层(Project Layer)而并不是隐藏层)。
+
+​	输出层，输出文本的类别。与Word2Vec一样，输出层有三种方法，分别是：Softmax，Hierarchical Softmax和Negative Sampling。其中，Softmax通过Hidden Layer求平均得到的Vector，乘以反变换矩阵，得到长度等于分类数的Vector，再使用Softmax得到概率最高的一类为最终分类结果。而后两种方法则是通过Huffman Tree和Negative Sampling两个trick来节省时间复杂度。
+
+​	其它参数：损失函数为Binary Logistic，二分类时与Cross-Entropy相同。FastText把Softmax的输出看作了每一类别的概率值。Optimizer为SGD。
+
+#####  两种N-gram
+
+​	N-gram是基于统计语言模型的算法。它的基本思想是将文本里面的内容按照字节进行大小为N的滑动窗口操作，形成了长度是N的字节片段序列。每一个字节片段称为gram，对所有gram的出现频度进行统计，并且按照事先设定好的阈值进行过滤，形成关键gram列表，也就是这个文本的向量特征空间，列表中的每一种gram就是一个特征向量维度。
+
+​	Subword n-gram feature(Character n-gram):  字符级别的N-gram. eg: 要将单词“universe”划分为<u，un，ni，iv，ve，er，rs，se>。
+
+​	N-gram feature(Word n-gram)：普通N-gram，以词滑动？？？
+
+​	这两种N-gram同时存在于Fasttext的训练中，其中第一种用于Character Embedding的计算。第二种用于Classification的输入层。
+
+​	Character n-gram首先解决了未登录词的问题，其次对于英语中词根和词缀相同的词，使用Character n-gram可以很好的获取它们之间的相似性。最后一点是论文中提到的，Character n-gram可以更好的来表示土耳其语、芬兰语等形态丰富的语言，对于语料中很少出现的单词也能够有很好的表示。
+
+​	Word n-gram特征的加入，提升了Fasttext获取词序信息的能力，因此在面对复杂的语言表述时，也能够更好的获取文本的语义信息。
+
+##### 搜到的其它技巧
+
+​	首先就是输出层使用的Hierarchical Softmax和Negative Sampling。Hierarchical Softmax使用噪音对比功率(NCE)中的理论，通过将一个多分类转化为多个二分类来实现计算复杂度的降低。为了实现同样的目的，Negative Sampling采用了加权采样的方法来抽样负样本而不是每次计算所有词出现的概率。fastText在计算softmax的时候采用**分层softmax**，这样可以大大提高运行的效率
+
+​	第二点是在存储Character n-gram和Word n-gram时，使用hash map的方式将对应的n-gram信息储存在bucket中，节省了空间复杂度，同时由于hash map寻址方式为直接寻址，也降低了查询的时间复杂度。
+
+​	第三，Fastext在进行训练时，提前计算出Character n-gram和Word n-gram，在训练时直接查询调取，也节省了时间复杂度。
+
+##### 实现
+
+处理数据格式(对分词后保存的文件进行格式整理)
+
+```python
+import pandas as pd
+df_train = pd.read_csv('train_text.txt', encoding='utf8', index_col=False,sep='\t',header = None,names=['lab','cut'])
+df_test = pd.read_csv('test_text.txt', encoding='utf8', index_col=False,sep='\t',header = None,names=['lab','cut'])
+```
+
+```python
+import numpy as np
+lab_num = np.linspace(0, 9, 10, endpoint=True,dtype = 'int')
+
+lab_n = []
+for i in lab_num:
+    a = '__label__' + str(lab_num[i])
+    lab_n.append(a)
+
+from collections import Counter
+from pprint import pprint
+
+lab_cnt = Counter(df_train['lab'])
+lab_all = list(lab_cnt)    
+lab_and_num_dic=dict(zip(lab_all, lab_n))
+
+def lab_num (x,lab_and_num_dic = lab_and_num_dic):
+    x = lab_and_num_dic[x]
+    return x
+
+LabNum_train = df_train['lab'].apply(lambda x: lab_num(x))
+LabNum_test = df_test['lab'].apply(lambda x: lab_num(x))
+
+dataset_train = pd.DataFrame(columns = ['lab','cut']) 
+dataset_train['lab'] = LabNum_train
+dataset_train['cut'] = df_train['cut']
+
+dataset_test = pd.DataFrame(columns = ['lab','cut']) 
+dataset_test['lab'] = LabNum_test
+dataset_test['cut'] = df_test['cut']
+
+np.savetxt('dataset_train.txt',dataset_train, fmt='%s', delimiter="\t",encoding='utf8')
+np.savetxt('dataset_test.txt',dataset_test, fmt='%s', delimiter="\t",encoding='utf8')
+
+```
+
+训练模型并保存
+
+```python
+import fasttext
+
+trainDataFile = 'dataset_train.txt'
+ 
+classifier = fasttext.train_supervised(
+    input = trainDataFile,
+    label_prefix = '__label__',
+    dim = 256,
+    epoch = 50,
+    lr = 1,
+    lr_update_rate = 50,
+    min_count = 3,
+    loss = 'softmax',
+    word_ngrams = 2,
+    bucket = 1000000)
+
+classifier.save_model("Model.bin")
+```
+
+计算测试机模型预测的准确率
+
+```python
+testDataFile = 'dataset_test.txt'
+ 
+classifier = fasttext.load_model('Model.bin') 
+ 
+result = classifier.test(testDataFile)
+print(result[0])
+print(result[1])
+print(result[2])
+```
+
+结果：
+
+​	词频加分布筛选后的分词数据(字典850词)1000条测试数据的准确率为0.9477。未筛选分词数据1000条测试数据的准确率为0.9609。
