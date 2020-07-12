@@ -603,7 +603,7 @@ plt.show()
 #### 循环神经网络RNN文本分类(LSTM长短记忆)
 
 $$
-c_i = f_i \bigotimes c_{i-1} + i_i \bigotimes tanh(W_i x_i + U_i h_{i-1} +b_c)
+c_i = f_i \otimes c_{i-1} + i_i \otimes tanh(W_i x_i + U_i h_{i-1} +b_c)
 $$
 
 
@@ -613,6 +613,335 @@ $$
 ![5ae2ccd60001754204630501](C:\Users\LiuYangstatistic\Pictures\Saved Pictures\5ae2ccd60001754204630501.jpg)
 
 ​	RNN网络在文本分类中，作用是用来提取句子的关键语义信息，根据提取的语义对文本进行区分；CNN的作用是用来提取文本的特征，根据特征进行分类。LSTM+CNN的作用，就是两者的结合，首先抽取文本关键语义，然后对语义提取关键特征。
+
+##### 实现
+
+数据预处理
+
+```python
+#encoding:utf-8
+from collections import Counter
+import tensorflow.contrib.keras as kr
+import numpy as np
+import codecs
+import re
+import jieba
+import pandas as pd
+
+#_my_function_______________________________________________________________________________
+
+def read_file(filename):
+    df = pd.read_csv(filename, encoding='utf8', index_col=False,sep='\t',header = None,names=['lab','cut'])
+    labels = list(df['lab'])
+    contents = list(df['cut'])
+
+    for i in range(len(contents)) :
+        contents[i] = str(contents[i])
+        contents[i] = contents[i].split()
+    
+    return labels ,contents
+
+#___________________________________________________________________________________________
+
+def my_built_vocab_vector(filename,voc_size = 9334):
+    all_data = []
+    j = 1
+    embeddings = np.zeros([9334, 100])
+
+    labels, content = read_file(filename)
+    for eachline in content:
+        line =[]
+        for i in range(len(eachline)):
+            line.append(eachline[i])
+        all_data.extend(line)
+
+    counter = Counter(all_data)
+    count_paris = counter.most_common(voc_size-1)
+    word, _ = list(zip(*count_paris))
+
+    f = codecs.open('./data/vector_word.txt', 'r', encoding='utf-8')
+    vocab_word = open('./data/data_a/vocab_word.txt', 'w', encoding='utf-8')
+    for ealine in f:
+        item = ealine.split(' ')
+        key = item[0]
+        vec = np.array(item[1:], dtype='float32')
+        if key in word:
+            embeddings[j] = np.array(vec)
+            vocab_word.write(key.strip('\r') + '\n')
+            j += 1
+    np.savez_compressed('./data/data_a/vector_word.npz', embeddings=embeddings)
+#___________________________________________________________________________________________
+
+def his_read_file(filename):
+    re_han = re.compile(u"([\u4E00-\u9FD5a-zA-Z0-9+#&\._%]+)")  # the method of cutting text by punctuation
+    contents, labels = [], []
+    with codecs.open(filename, 'r', encoding='utf-8') as f:
+        for line in f:
+            try:
+                line = line.rstrip()
+                assert len(line.split('\t')) == 2
+                label, content = line.split('\t')
+                labels.append(label)
+                blocks = re_han.split(content)
+                word = []
+                for blk in blocks:
+                    if re_han.match(blk):
+                        word.extend(jieba.lcut(blk))
+                contents.append(word)
+            except:
+                pass
+    return labels, contents
+
+def built_vocab_vector(filenames,voc_size = 10000):
+    
+    stopword = open('./data/stopwords.txt', 'r', encoding='utf-8')
+    stop = [key.strip(' \n') for key in stopword]
+
+    all_data = []
+    j = 1
+    embeddings = np.zeros([10000, 100])
+
+    for filename in filenames:
+        labels, content = read_file(filename)
+        for eachline in content:
+            line =[]
+            for i in range(len(eachline)):
+                if str(eachline[i]) not in stop:#去停用词
+                    line.append(eachline[i])
+            all_data.extend(line)
+
+    counter = Counter(all_data)
+    count_paris = counter.most_common(voc_size-1)
+    word, _ = list(zip(*count_paris))
+
+    f = codecs.open('./data/vector_word.txt', 'r', encoding='utf-8')
+    vocab_word = open('./data/vocab_word.txt', 'w', encoding='utf-8')
+    for ealine in f:
+        item = ealine.split(' ')
+        key = item[0]
+        vec = np.array(item[1:], dtype='float32')
+        if key in word:
+            embeddings[j] = np.array(vec)
+            vocab_word.write(key.strip('\r') + '\n')
+            j += 1
+    np.savez_compressed('./data/vector_word.npz', embeddings=embeddings)
+
+
+def get_wordid(filename):
+    key = open(filename, 'r', encoding='utf-8')
+
+    wordid = {}
+    wordid['<PAD>'] = 0
+    j = 1
+    for w in key:
+        w = w.strip('\n')
+        w = w.strip('\r')
+        wordid[w] = j
+        j += 1
+    return wordid
+
+
+def read_category():
+    categories = ['体育', '财经', '房产', '家居', '教育', '科技', '时尚', '时政', '游戏', '娱乐']
+    cat_to_id = dict(zip(categories, range(len(categories))))
+    return categories, cat_to_id
+
+def process(filename, word_to_id, cat_to_id, max_length=300):
+    labels, contents = read_file(filename)
+
+    data_id, label_id = [], []
+
+    for i in range(len(contents)):
+        data_id.append([word_to_id[x] for x in contents[i] if x in word_to_id])
+        label_id.append(cat_to_id[labels[i]])
+    x_pad = kr.preprocessing.sequence.pad_sequences(data_id, max_length, padding='post', truncating='post')
+    y_pad = kr.utils.to_categorical(label_id)
+    return x_pad, y_pad
+
+def get_word2vec(filename):
+    with np.load(filename) as data:
+        return data["embeddings"]
+
+
+def batch_iter(x, y, batch_size = 64):
+    data_len = len(x)
+    num_batch = int((data_len - 1)/batch_size) + 1
+    indices = np.random.permutation(np.arange(data_len))
+    '''
+    np.arange(4) = [0,1,2,3]
+    np.random.permutation([1, 4, 9, 12, 15]) = [15,  1,  9,  4, 12]
+    '''
+    x_shuff = x[indices]
+    y_shuff = y[indices]
+    for i in range(num_batch):
+        start_id = i * batch_size
+        end_id = min((i+1) * batch_size, data_len)
+        yield x_shuff[start_id:end_id], y_shuff[start_id:end_id]
+
+def seq_length(x_batch):
+    real_seq_len = []
+    for line in x_batch:
+        real_seq_len.append(np.sum(np.sign(line)))
+
+    return real_seq_len
+```
+
+参数设置
+
+```python
+# -*- coding: utf-8 -*-
+class Parameters(object):
+
+    embedding_dim = 100      #dimension of word embedding
+    vocab_size = 9334      #number of vocabulary
+    pre_trianing = None      #use vector_char trained by word2vec
+
+    seq_length = 300          #max length of sentence
+    num_classes = 10          #number of labels
+    hidden_dim = 128        #the number of hidden units
+    filters_size = [2, 3, 4]
+    num_filters = 128
+
+    keep_prob = 0.5         #droppout
+    learning_rate = 1e-3    #learning rate
+    lr_decay = 0.9          #learning rate decay
+    clip = 5.0              #gradient clipping threshold
+
+    num_epochs = 3          #epochs
+    batch_size = 64         #batch_size
+
+
+    train_filename = './data/train_cut.txt'  #train data  √
+    test_filename = './data/test.txt'    #test data  √
+    val_filename = './data/cnews.val_a.txt'      #validation data  ×
+    vocab_filename = './data/data_a/vocab_word.txt'        #vocabulary  √
+    vector_word_filename = './data/vector_word.txt'  #vector_word trained by word2vec  ×
+    vector_word_npz = './data/data_a/vector_word.npz'   # save vector_word to numpy file  √
+```
+
+建立词向量
+
+```python
+from data_processing_my import  my_built_vocab_vector
+
+my_built_vocab_vector('./data/train_cut.txt',voc_size = 9334)
+```
+
+训练模型
+
+```python
+import os
+import tensorflow as tf
+from Parameters import Parameters as pm
+from data_processing_my import read_category, get_wordid, get_word2vec, process, batch_iter, seq_length
+from Lstm_Cnn import Lstm_CNN
+```
+
+```python
+tensorboard_dir = './tensorboard/Lstm_CNN'
+save_dir = './checkpoints/Lstm_CNN_a_2'
+if not os.path.exists(tensorboard_dir):
+    os.makedirs(tensorboard_dir)
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
+save_path = os.path.join(save_dir, 'best_validation')
+
+pm = pm
+filenames = [pm.train_filename, pm.test_filename, pm.val_filename]
+categories, cat_to_id = read_category()
+wordid = get_wordid(pm.vocab_filename)
+pm.vocab_size = len(wordid)
+pm.pre_trianing = get_word2vec(pm.vector_word_npz)
+
+model = Lstm_CNN()
+
+tf.summary.scalar('loss', model.loss)
+tf.summary.scalar('accuracy', model.accuracy)
+merged_summary = tf.summary.merge_all()
+writer = tf.summary.FileWriter(tensorboard_dir)
+saver = tf.train.Saver()
+session = tf.Session()
+session.run(tf.global_variables_initializer())
+writer.add_graph(session.graph)
+```
+
+```python
+x_train, y_train = process(pm.train_filename, wordid, cat_to_id, max_length=300)
+x_test, y_test = process(pm.test_filename, wordid, cat_to_id, max_length=300)
+```
+
+```python
+for epoch in range(pm.num_epochs):
+    print('Epoch:', epoch+1)
+    num_batchs = int((len(x_train) - 1) / pm.batch_size) + 1
+    batch_train = batch_iter(x_train, y_train, batch_size=pm.batch_size)
+    for x_batch, y_batch in batch_train:
+        real_seq_len = seq_length(x_batch)
+        feed_dict = model.feed_data(x_batch, y_batch, real_seq_len, pm.keep_prob)
+        _, global_step, _summary, train_loss, train_accuracy = session.run([model.optimizer, model.global_step, merged_summary,
+                                                                                model.loss, model.accuracy], feed_dict=feed_dict)
+        if global_step % 100 == 0:
+            test_loss, test_accuracy = model.test(session, x_test, y_test)
+            print('global_step:', global_step, 'train_loss:', train_loss, 'train_accuracy:', train_accuracy,
+                    'test_loss:', test_loss, 'test_accuracy:', test_accuracy)
+
+        if global_step % num_batchs == 0:
+            print('Saving Model...')
+            saver.save(session, save_path, global_step=global_step)
+
+    pm.learning_rate *= pm.lr_decay
+```
+
+计算准确率
+
+```python
+import numpy as np
+from Lstm_Cnn import Lstm_CNN
+import tensorflow as tf
+from data_processing import read_category, get_wordid, get_word2vec, process, batch_iter, seq_length
+from Parameters import Parameters as pm
+
+def val():
+
+    pre_label = []
+    label = []
+    session = tf.Session()
+    session.run(tf.global_variables_initializer())
+    save_path = tf.train.latest_checkpoint('./checkpoints/Lstm_CNN_a')
+    saver = tf.train.Saver()
+    saver.restore(sess=session, save_path=save_path)
+
+    val_x, val_y = process(pm.val_filename, wordid, cat_to_id, max_length=pm.seq_length)
+    batch_val = batch_iter(val_x, val_y, batch_size=64)
+    for x_batch, y_batch in batch_val:
+        real_seq_len = seq_length(x_batch)
+        feed_dict = model.feed_data(x_batch, y_batch, real_seq_len, 1.0)
+        pre_lab = session.run(model.predict, feed_dict=feed_dict)
+        pre_label.extend(pre_lab)
+        label.extend(y_batch)
+    return pre_label, label
+
+
+if __name__ == '__main__':
+
+    pm = pm
+    sentences = []
+    label2 = []
+    categories, cat_to_id = read_category()
+    wordid = get_wordid(pm.vocab_filename)
+    pm.vocab_size = len(wordid)
+    pm.pre_trianing = get_word2vec(pm.vector_word_npz)
+
+    model = Lstm_CNN()
+    pre_label, label = val()
+    correct = np.equal(pre_label, np.argmax(label, 1))
+    accuracy = np.mean(np.cast['float32'](correct))
+    print('accuracy:', accuracy)
+    #print("预测前10项：", ' '.join(str(pre_label[:10])))
+    #print("正确前10项：", ' '.join(str(np.argmax(label[:10], 1))))
+```
+
+
 
 |    模型   |    模型1   |    模型2   |    模型3   |    模型4   |
 | :---------: | :---------: | :---------: | :---------: | :---------: |
