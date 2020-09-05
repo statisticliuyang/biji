@@ -1110,3 +1110,516 @@ print(result[2])
 结果：
 
 ​	词频加分布筛选后的分词数据(字典850词)1000条测试数据的准确率为0.9477。未筛选分词数据1000条测试数据的准确率为0.9609。
+
+#### 贝叶斯网络
+
+文献阅读
+
+*A note minimal d-separation trees for structural learning*
+
+背景知识（参考周志华所著<机器学习>相关内容）
+
+​	贝叶斯网络B = <Graph,Parametr>由表示变量间关系的有向无环图DAG和每个变量所对应的条件概率表CPT构成。
+
+![eg](D:\LiuYangStatistics\code\biji\biji\eg.png)
+
+​    各变量间的独立性是一个十分重要的问题，是进行进一步工作的基础和前提。贝叶斯网的结构有效地表达了各变量间的条件独立性：给定父节点，贝叶斯网假设每个变量与它的非后裔变量独立，于是贝叶斯网B的将各变量的联合分布概率定义为：
+$$
+P_{B}(x_1 , x_2 , \cdots ,x_d) = \prod^{d}_{i=1}P_B(x_i | \pi_i)=\prod^{d}_{i=1}\theta_{x_i|\pi_i}
+$$
+以上图为例，联合概率分布为：
+$$
+P(x_1,x_2,\cdots,x_d)=P(x_1)P(x_2)P(x_3|x_1)P(x_4|x_1,x_2)P(x_5|x_2).
+$$
+​	在贝叶斯网中，三种基本关系如下图所示。在同父结构中，显然若父节点已知，则两个子节点独立；在顺序结构中，若x已知，则y,z独立；V型结构中情况有所不同，若子节点未知，则两父节点独立，若子节点已知，则两父节点不独立。
+
+![gx](D:\LiuYangStatistics\code\biji\biji\gx.png)
+
+为了分析有向图中所有变量的条件独立性，可以使用有向分离(D-separation)(Probabilistic Networks and Expert Systems,1999;Probabilitic Reasoning in Intelligent Systems: Networks of Plausible Inference,1988)。首先将有向图转化为无向图：
+
+- 找出有向图中所有的V型结构，在父节点间连线(无向)；
+- 将所有的边改成无向边。
+
+由此产生的图为“道德图”，其过程为道德化。
+
+![XG](D:\LiuYangStatistics\code\biji\biji\XG.png)
+
+​	若变量x,y可以被变量集合Z在图中分开，即去掉Z后，x,y分属两个连通分支，则称x,y被Z有向分离，x⊥y|Z成立。例中有：
+$$
+x_3\perp x_4|x_1,x_3 \perp x_2|x_1,x_3 \perp x_5|x_2.
+$$
+
+​	贝叶斯网的训练分为两部分，一是网络结构的训练，二是每个节点的概率表。当网络结构已知的时候很简单，只需要以频率代替概率，对训练样本计数就可以得到每个节点的概率表的极大似然估计。当结构网未知的时候情况就比较复杂啦。
+
+​	构造得分函数，来评价一个模型的优劣，得分函数带有强烈的主观倾向，即你希望得到的模型具有什么特点，就需要根据这一特点构造得分函数，在此以最小描述长度(MDL):
+$$
+s(B|D)=f(\theta)|B|-LL(B|D) \\ D=\{x_1,x_2,\cdots,x_m\}为数据集
+$$
+得分函数的第一项代表模型规模的大小为描述每个参数所需的编码位数×贝叶斯网的参数个数；第二项为对数似然函数：
+$$
+LL(B|D)=\sum^{m}_{i=1}logP_B(x_i)
+$$
+由此可以看出：
+
+- 当f=1时,为AIC；
+- 当f=log m / 2时，为BIC；
+- 当f=0时，学习任务退化为极大似然估计；
+- 若结构网固定，极大似然估计等价于频率值。
+
+​     但是在根据得分函数和观测值训练模型的时候，搜索网络结构是一件十分困难的事情，可以想象一下具有n个节点的贝叶斯网可能具有的结构网络的数量是多少。有两种常用的策略可以使用：
+
+- 贪心法：从一个给定的结构出发，每次删减或增加一条边；
+- 约束法：将网络结构限制为某些类型，例如树形，塔型。
+
+可以看出，贪心法对初值过于敏感，在约束法中约束条件的选择影响十分巨大。
+
+​	在贝叶斯网模型训练完成后，在理论上我们若已知一些特定的数据，则可以精确地推断出目标节点的条件概率分布，但在实际操作的过程中过于复杂，可以想象一下，其已经被证明是困难的(The computational complexity of probabilistic inference using Bayesian belief networks,1990)。为此，当贝叶斯网节点较多，连接稠密时，可以采用近似推断的方法求近似解。在此使用吉布斯采样：
+
+![吉布斯](D:\LiuYangStatistics\code\biji\biji\吉布斯.png)
+
+思考如何利用吉布斯采样训练模型，这样的训练方法类似与MCMC方法。
+
+​	事实上，吉布斯分布是在参数空间的子空间上的随机漫步，可以证明吉布斯抽样是平稳分布存在的马尔科夫链，由此间接证明了吉布斯抽样的收敛性，并且其恰巧收敛于P(Q=q |E =e)，其中E为已知的证据变量，Q为需要预测的目标变量(张波等人的<应用随机过程>第四版，李航的<统计机器学习>第二版，周志华的<机器学习>第14章)。
+
+#### 市长电话数据分类
+
+##### LSTM
+
+准确率0.75~0.78
+
+##### FastText
+
+读入数据，整理格式，分离训练集与测试集
+
+```python
+import pandas as pd
+import numpy as np
+
+def str_replace (x):
+    x = x.replace("/"," ")
+    return x
+
+def add_LabelIndex (x):
+    x = '__label__' + str(x)
+    return x
+
+def data_pro (filenames,star = 0, end = 0):
+    
+    DataSet = pd.DataFrame(columns = ['lab','con']) 
+    
+    file_seg = open(filenames[0],encoding='utf-8')
+    df_seg = pd.read_table(file_seg,header=None,names = ['con'])
+    
+    file_lab = open(filenames[1],encoding='utf-8')
+    df_lab = pd.read_table(file_lab,header=None,names = ['lab'])
+    
+    df_lab = df_lab[0:len(df_seg['con'])]
+    
+    if end != 0:
+        df_seg = df_seg[star:end]
+        df_lab = df_lab[star:end]
+    
+    print("内容条数: %d ." % len(df_seg['con']))
+    print("标签条数：%d ." % len(df_lab['lab']))
+    
+    DataSet['con'] = df_seg['con'].apply(lambda x: str_replace(x))
+    
+    DataSet['lab'] = df_lab['lab'].apply(lambda x: add_LabelIndex(x))
+    
+    np.savetxt(filenames[2],DataSet,fmt='%s',delimiter="\t",encoding='utf8')
+    
+    return 233
+
+files = ['D:/数据集/训练单位投诉内容分词UTF8.txt','D:/数据集/训练单位代码.txt','DataSet_train.txt']
+data_pro(files, end = 50000)
+files = ['D:/数据集/训练单位投诉内容分词UTF8.txt','D:/数据集/训练单位代码.txt','DataSet_test.txt']
+data_pro(files,star = 50001,end = 55001)
+```
+
+训练模型并保存
+
+```python
+import fasttext
+
+trainDataFile = 'DataSet_train.txt'
+ 
+classifier = fasttext.train_supervised(
+    input = trainDataFile,
+    label_prefix = '__label__',
+    dim = 128,
+    epoch = 5,
+    lr = 1,
+    lr_update_rate = 100,
+    min_count = 10,
+    loss = 'hs',
+    word_ngrams = 3,
+    bucket = 2000000)
+
+classifier.save_model("Model.bin")
+```
+
+预测并计算准确率
+
+```python
+testDataFile = 'DataSet_test.txt'
+ 
+classifier = fasttext.load_model('Model.bin') 
+ 
+result = classifier.test(testDataFile)
+print(result[0])
+print(result[1])
+print(result[2])
+```
+
+准确率0.75~0.78
+
+Group of FastText
+
+```python
+import GroupsOfFestText as GF
+import time
+import numpy as np
+```
+
+产生分布律以及日期
+
+```python
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
+
+a,b = GF.get_prob_2dim(16,8,5,6)
+
+sns.heatmap(pd.DataFrame(a), cmap="YlGnBu")
+print(b)
+
+print(a)
+```
+
+![1](D:\LiuYangStatistics\code\biji\biji\1.png)
+
+```python
+a,b = GF.get_prob_2(16,8,4,3)
+
+sns.heatmap(pd.DataFrame(a), cmap="YlGnBu")
+print(b)
+
+print(a)
+```
+
+![2](D:\LiuYangStatistics\code\biji\biji\2.png)
+
+```python
+#分布率产生模块测试
+RandomNum = GF.get_RandomNum(year = 16,mounth=11,row = 2,col = 10 ,sigma1 = 1,sigma2 = 1)
+```
+
+```python
+#抽样数据模块测试
+GF.get_ModelsData(2,RandomNum = RandomNum , date='1612',rate = 0.3)
+```
+
+```python
+#抽样数据模块测试
+GF.get_ModelsData(2,RandomNum = RandomNum , date='1612',rate = 0.3)
+```
+
+```python
+#模型训练模块测试
+GF.train_models(2,date='1612')
+```
+
+```python
+#测试数据整理模块测试
+rg = np.linspace(1601, 1612, 12, endpoint=True,dtype = 'int')
+GF.get_TestData (rg = rg)
+```
+
+```python
+#预测以及输出准确率模块测试
+pt ,ac= GF.get_NPredict (num = 2,date = '1612',AC = True)
+print(pt)
+print(ac)
+```
+
+```python
+#调试参数模块
+
+import GroupsOfFestText as GF
+import time
+
+start_time = time.time()
+
+ac = GF.tiaoshi(date = '1609',#预测目标
+                year = 16,#已知数据年月
+                mounth = 8,
+                row = 100,#模型个数  #需调试
+                col = 4,#每个模型的数据抽样次数  #需调试
+                sigma1 = 1,#时间性  #需调试
+                sigma2 = 2,#周期性  #需调试
+                rate = 0.3,#模型每次抽样的抽样比例  #需调试
+                dim=256,#需调试
+                epoch=5,#需调试
+                lr=1,#需调试
+                lrr=100,#需调试
+                min_count=2,#需调试
+                word_ngrams=2,#需调试
+                bucket=2000000,#需调试
+                RS=True,
+                jion = False)
+
+end_time = time.time()
+
+print("调试用时:", end_time - start_time)
+print("准确率:",ac)
+```
+
+准确率0.8~0.81
+
+包中内容
+
+```python
+import numpy as np
+from sklearn.utils import shuffle as reset
+import pandas as pd
+import fasttext as ft
+#import warnings
+
+def get_prob_2(year,mounth,sigma1 = 1, sigma2 = 1):
+    
+    a = year
+    b = mounth
+    
+    h1 = [a,a-1,a-2,a-3,a-4,a-5,a-6,a-7,a-8,a-9,a-10,a-11]
+    x = np.array([h1,h1,h1,h1,h1,h1,h1,h1,h1,h1,h1,h1])
+    frac_x_d = ((2*3.1415926)**0.5)*sigma1
+    frac_x_u_l = -0.5*(((x-a)/sigma1)**2)
+    frac_x_u = np.exp(frac_x_u_l)
+    prob_x = frac_x_u/frac_x_d
+    
+    h2 = [b-5,b-4,b-3,b-2,b-1,b,b+1,b+2,b+3,b+4,b+5,b+6]
+    y = np.array([h2,h2,h2,h2,h2,h2,h2,h2,h2,h2,h2,h2])
+    y = np.transpose(y)
+    frac_y_d = ((2*3.1415926)**0.5)*sigma2
+    frac_y_u_l = -0.5*(((y-b-1)/sigma2)**2)
+    frac_y_u = np.exp(frac_y_u_l)
+    prob_y = frac_y_u/frac_y_d
+    
+    prob_2 = prob_x*prob_y
+    
+        
+    c = x*100+((y + 12) % 12) #0月代表十二月
+    c[c%100==0] =  c[c%100==0]+12
+    riqi = a*100+((b + 12) % 12)
+    if b == 12 :
+        riqi += 12
+    
+    prob_2[c>riqi] = 0
+    
+    prob_2 = prob_2/np.sum(prob_2)
+    
+    return prob_2 ,c
+
+def get_RandomNum_2 (year,mounth,row,col ,sigma1 = 1,sigma2 = 1):
+    a , b = get_prob_2(year = year,mounth = mounth ,sigma1 = sigma1,sigma2 = sigma2)
+    a = a.flatten()
+    b = b.flatten()
+    RandomNum = np.random.choice(b,row*col,p = a)
+    RandomNum.resize(row,col)
+    return RandomNum
+
+def get_prob_2dim (year ,mounth ,sigma1 = 1,sigma2 = 1):
+    
+    a = year
+    b = mounth
+    
+    h1 = [a,a-1,a-2,a-3,a-4,a-5,a-6,a-7,a-8,a-9,a-10,a-11]
+    x = np.array([h1,h1,h1,h1,h1,h1,h1,h1,h1,h1,h1,h1])
+    
+    h2 = [b-5,b-4,b-3,b-2,b-1,b,b+1,b+2,b+3,b+4,b+5,b+6]
+    y = np.array([h2,h2,h2,h2,h2,h2,h2,h2,h2,h2,h2,h2])
+    y = np.transpose(y)
+    
+    frac_d = 2*3.1415926*sigma1*sigma2
+    frac_u_l = ((x-a)*(y-b)/(sigma1*sigma2))-0.5*((((x-a)**2)/(sigma1**2))+(((y-b)**2)/(sigma2**2)))
+    frac_u = np.exp(frac_u_l)
+    
+    prob_2dim = frac_u/frac_d
+    
+    c = x*100+((y + 12) % 12) #0月代表十二月
+    c[c%100==0] =  c[c%100==0]+12
+    riqi = a*100+((b + 12) % 12)
+    if b == 12 :
+        riqi += 12
+    
+    prob_2dim[c>riqi] = 0
+    
+    prob_2dim = prob_2dim/np.sum(prob_2dim)
+    return prob_2dim , c
+
+
+def get_RandomNum (year,mounth,row,col ,sigma1 = 1,sigma2 = 1):
+    a , b = get_prob_2dim(year = year,mounth = mounth ,sigma1 = sigma1,sigma2 = sigma2)
+    a = a.flatten()
+    b = b.flatten()
+    RandomNum = np.random.choice(b,row*col,p = a)
+    RandomNum.resize(row,col)
+    return RandomNum
+
+
+def get_riqi (x):
+    x = x[2:6]
+    return int(x)
+
+def str_replace (x):
+    x = str(x)
+    x = x.replace("/"," ")
+    return x
+
+def train_test_split_fun(data, test_size=0.3, shuffle=True, random_state=None):
+    if shuffle:
+        data = reset(data, random_state=random_state)
+    train = data[int(len(data)*test_size):].reset_index(drop = True)
+    test  = data[:int(len(data)*test_size)].reset_index(drop = True)
+    
+    return train, test
+
+
+def get_ModelsData (num,RandomNum,date,rate = 0.3):
+    #df_riqi = pd.read_table(file_riqi,header=None,names = ['NYR'],converters={'NYR':str()})
+    df_riqi = pd.read_table('riqi.txt',header=None,names = ['NYR'],dtype=str)
+    riqi = df_riqi['NYR'].apply(lambda x: get_riqi(x)).values
+
+    #df = pd.read_table('riqi.txt',header=None,names = ['NYR'],dtype=str)
+    file_zh = open('zuhe.txt',encoding='utf-8')#
+    df = pd.read_table(file_zh,header=None,names = ['lab','con'])
+    df['con'] = df['con'].apply(lambda x: str_replace(x))
+
+    for i in range(0,num):
+        data = []
+        for j in RandomNum[i,:]:
+            Data = df[riqi == j]
+            DataSet,_ = train_test_split_fun(Data,test_size = 1-rate)
+            data.append(DataSet)
+        results=pd.concat(data)
+        Name = './models_data/'+date+'/'+str(i+1)+'.txt'
+        np.savetxt(Name,results,fmt='%s',delimiter="\t",encoding='utf8')
+    return '完成'
+
+def train_models (num,date,dim=128,epoch=5,lr=1,lrr=100,min_count=10,word_ngrams=3,bucket = 2000000):
+    for i in range(0,num):
+        trainDataFile = './models_data/'+date+'/'+str(i+1)+'.txt'
+ 
+        classifier = ft.train_supervised(
+            input = trainDataFile,
+            label_prefix = '__label__',
+            dim = dim,
+            epoch = epoch,
+            lr = lr,
+            lr_update_rate = lrr,
+            min_count = min_count,
+            loss = 'hs',
+            word_ngrams = word_ngrams,
+            bucket = bucket)
+
+        name_save = './models/'+date+'/'+'Model_'+str(i+1)+'.bin'
+        classifier.save_model(name_save)
+    return '完成'
+
+def get_TestData (rg):
+    df_riqi = pd.read_table('riqi.txt',header=None,names = ['NYR'],dtype=str)
+    riqi = df_riqi['NYR'].apply(lambda x: get_riqi(x)).values
+
+    file_zh = open('zuhe.txt',encoding='utf-8')#
+    df = pd.read_table(file_zh,header=None,names = ['lab','con'])
+    df['con'] = df['con'].apply(lambda x: str_replace(x))
+
+    for i in rg:
+        DataSet = df[riqi == i]
+        Name = './models_test/'+str(i)+'.txt'
+        np.savetxt(Name,DataSet,fmt='%s',delimiter="\t",encoding='utf8')
+    return '完成'
+
+
+def get_predict (x,num,date):
+    #warnings.filterwarnings('ignore')
+    putout = []
+    for i in range(0,num):
+        name_save = './models/'+date+'/'+'Model_'+str(i+1)+'.bin'
+        classifier = ft.load_model(name_save)
+        res,_= classifier.predict(x)
+        res = res[0]
+        res = int(res[9:])
+        putout.append(res)
+
+    counts = np.bincount(putout)
+    return np.argmax(counts)
+
+
+def get_NPredict (num,date,pre,AC = False):
+    name =  './models_test/'+pre+'.txt'
+    file_test = open(name,encoding='utf-8')#
+    df = pd.read_table(file_test,header=None,names = ['lab','con'])
+    text = list(df['con'])
+    
+    le = len(text)
+    out = np.zeros((num,le))
+    
+    for i in range(0,num):
+        name_save = './models/' + date + '/' + 'Model_' + str(i+1) + '.bin'
+        classifier = ft.load_model(name_save)
+        res,_= classifier.predict(text)
+        for j in range(0,le):
+            resj=res[j][0]
+            out[i,j] = int(resj[9:])
+            
+    out = np.transpose(out)
+    putout = np.zeros(le)
+    for i in range(0,le):
+        hp = list(out[i])
+        counts = np.bincount(hp)
+        putout[i] = np.argmax(counts) 
+    
+    if AC :
+        lab = list(df['lab'])
+        lab_num = np.zeros(le)
+        tr = np.ones(le)
+        for i in range(0,le):
+            lab_num[i]=lab[i][9:]
+        ac = sum(tr[lab_num==putout])/le
+        return putout ,ac
+    else :
+        return putout
+    
+def tiaoshi (date,year,mounth,row,col,sigma1,sigma2,rate,dim=128,epoch=5,lr=1,lrr=100,min_count=10,word_ngrams=3,bucket=2000000,RS=True,jion = True):
+    if RS :
+        if jion :
+            RandomNum = get_RandomNum(year = year,
+                              mounth=mounth,
+                              row = row,
+                              col = col,
+                              sigma1 = sigma1,
+                              sigma2 = sigma2)
+        else :
+            RandomNum = get_RandomNum_2(year = year,
+                               mounth=mounth,
+                               row = row,
+                               col = col,
+                               sigma1 = sigma1,
+                               sigma2 = sigma2)
+        get_ModelsData(num=row,RandomNum = RandomNum , date=date,rate=rate)
+    
+    train_models(num = row,
+             date = date,
+             dim = dim,
+             epoch=epoch,
+             lr=lr,
+             lrr=lrr,
+             min_count=min_count,
+             word_ngrams=word_ngrams,
+             bucket = bucket)
+    
+    _ ,ac= get_NPredict (num = row,date = date,pre = date,AC = True)
+    return ac
+```
+
