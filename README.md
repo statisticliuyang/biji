@@ -990,7 +990,7 @@ if __name__ == '__main__':
 
 ```mermaid
 graph TD
-A(输入层: 文本中的单词和N-gram Feature的Embedding) -->B(隐藏层: 在这一层进行的操作只是将输出层输入的Embedding Vector进行求平均)	
+A(输入层: 文本中的单词和N-gram Feature的Embedding) -->B(隐藏层: 在这一层进行的操作只是将输入层输入的Embedding Vector进行求平均)	
 	B --> C(输出层: 输出文本的类别)
 ```
 
